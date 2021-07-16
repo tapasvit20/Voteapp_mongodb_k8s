@@ -1,0 +1,17 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: api
+  namespace: vote
+  labels:
+    role: api
+    env: demo
+spec:
+ rules:
+ - host: <hostname>
+   http:
+     paths:
+     - path: /
+       backend:
+         serviceName: api
+         servicePort: 8080
