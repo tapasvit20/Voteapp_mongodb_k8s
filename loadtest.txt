@@ -1,0 +1,148 @@
+# Testing MongoDB on Kubernetes with locust
+
+Mongo is installed as statefulset in replicaset.
+
+Add  all the alias — mongodb-{0–2}  to your hosts file /etc/hosts.
+
+Use service to select individual pods in the statefulset as below:
+
+The selector statefulset.kubernetes.io/pod-name is automatically added to pods in statefulset by Kubernetes and helps us target each pod easily.
+kubectl apply -f service.mongo.yaml
+
+=====service.mongo.yaml=====
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-0
+  namespace: vote
+  labels:
+    app.kubernetes.io/name: mongodb
+    app.kubernetes.io/component: mongodb
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - name: mongodb
+      port: 27017
+      targetPort: mongodb
+  selector:
+    app.kubernetes.io/name: mongodb
+    app.kubernetes.io/component: mongodb
+    statefulset.kubernetes.io/pod-name: mongodb-0
+	
+	
+Expose all the members of mongo replicaset  using below mentioned script and expose pods on different ports to make this work:
+
+# Make target
+
+port-forward:
+    while true; do \
+        kubectl port-forward -n vote service/mongodb-0 27017:27017 & \
+        kubectl port-forward -n vote service/mongodb-1 27011:27017 & \
+        kubectl port-forward -n vote service/mongodb-2 27012:27017 \
+        
+    done;
+    
+ # Shell command
+ 
+ (trap 'kill 0' INT; kubectl -n my-ns port-forward service/mongodb-0 27017:27017 & kubectl -n my-ns port-forward service/mongodb-1 27011:27017 & kubectl port-forward -n my-ns service/mongodb-2 27012:27017)
+ 
+ Using this  connection string, able to connect to replicaset properly: 
+ 
+ conn = MongoClient('mongodb://mongodb-0:27017,mongodb-1:27011,mongodb-2:27012', replicaSet='rs0')
+ 
+
+Next step Load testing Mongodb on Kubernetes with Locust load testing framework:
+
+Prerequisites: Python 3.6+ , pip3
+
+Install Locust using pip:
+pip3 install locust
+
+Validate your installation:
+locust -V
+
+Now use  locust test  file loadtest.py  as below:
+
+from locust import User, task, constant, tag
+from pymongo import MongoClient
+from time import perf_counter
+
+
+class Mongo:
+    conn = ""
+
+    def __init__(self):
+        cs = 'mongodb://mongodb-0:27017,mongodb-1:27011,mongodb-2:27012'
+        self.conn = MongoClient(cs, connect=False, replicaSet='rs0')
+
+    def get_conn(self):
+        return self.conn
+
+mongo_client = Mongo()
+
+class Mongouser(User):
+    wait_time = constant(1)
+
+    @task
+    @tag("GET")
+    def aggregate_test(self):
+        with mongo_client.get_conn() as cx:
+            db = cx.test
+
+            start_time = perf_counter()
+
+            # dummy aggregate example
+            pipeline = [
+                {"$unwind": "$tags"},
+                {"$group": {"_id": "$tags", "count": {"$sum": 1}}},
+                {"$sort": SON([("count", -1), ("_id", -1)])}
+            ]
+            data = list(db.test_collection.aggregate(pipeline))
+            duration = perf_counter() - start_time
+
+            if data:
+                self.environment.events.request_success.fire(request_type="GET", name="Aggregate test",
+                                                             response_time=duration, response_length=len(data))
+            else:
+                self.environment.events.request_failure.fire(request_type="GET", name="Aggregate test",
+                                                             response_time=duration, response_length=0)
+
+    @task
+    @tag("GET")
+    def fetch_test(self):
+        with mongo_client.get_conn() as cx:
+            db = cx.test
+            start_time = perf_counter()
+            try:
+                doc_count = db.test_collection.count_documents({})
+                duration = perf_counter() - start_time
+
+                self.environment.events.request_success.fire(request_type="GET", name="Fetch documents",
+                                                             response_time=duration, response_length=doc_count)
+            except Exception as e:
+                duration = perf_counter() - start_time
+                print(e)
+                self.environment.events.request_failure.fire(request_type="GET", name="Fetch documents",
+                                                             response_time=duration, response_length=0, exception=e)
+															 
+												
+
+Run the locust framework using locust -f loadtest.PY.
+
+This will open up an UI which can be used to set users and rate of users  for efficient load testing.
+
+using cli: locust --users 10000 --spawn-rate 100
+
+
+
+
+
+
+
+	
+
+
+
+
