@@ -18,6 +18,24 @@ Provides the declarative YAML files used to deploy an end-to-end web voting appl
 
 # Mongo K8s Scaling
 
+Cluster Details:
+
+Nodes : 3
+
+Master Node: (2-cpu)
+
+Workers:
+
+CPU : 8 (2-nodes)
+
+RAM : 16GB (total)
+
+Disk Space : 50GB
+
+Kubernetes Version: v1.18.6
+
+
+
 # Dynamically provision NFS persistent volumes in Kubernetes  to bind PVC:
 
 sudo mkdir /srv/nfs/kubedata -p
@@ -80,6 +98,10 @@ It will craete pv automatically and when it  will delete claim will delete the p
 Verify  the  file on path:
 
 ls /srv/nfs/kubedata
+
+# kubectl -n vote  get all
+
+![K8s Deployment](/doc/Capture0.PNG)
   
   
   # ---mongo-statefulset deployment---
@@ -149,6 +171,10 @@ cd frontend
 
 kubectl apply -f .
 
+
+# kubectl -n vote  get sts
+
+![K8s Deployment](/doc/Capture1.PNG)
 
 
 For Autoscaling the mongo-db statefulset:
