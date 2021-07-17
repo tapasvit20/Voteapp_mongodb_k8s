@@ -99,7 +99,7 @@ Verify  the  file on path:
 
 ls /srv/nfs/kubedata
 
-# kubectl -n vote  get all
+kubectl -n vote  get all
 
 ![K8s Deployment](/doc/Capture0.PNG)
   
@@ -172,7 +172,7 @@ cd frontend
 kubectl apply -f .
 
 
-# kubectl -n vote  get sts
+kubectl -n vote  get sts
 
 ![K8s Deployment](/doc/Capture1.PNG)
 
